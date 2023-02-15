@@ -96,9 +96,8 @@ model.fit(x_data, y_data, epochs=10, batch_size=best_batch_size)
 
 # Use the trained model to predict the next hour's price
 last_data = df.tail(lookback)[['open', 'high', 'low', 'close', 'volume']].values
-last_data = scaler.transform(last_data)
-x_test = np.array([last_data])
-predicted_price = scaler.inverse_transform(model.predict(x_test))
+last_data = scaler.transform(last_data.reshape(1, lookback, 5))
+predicted_price = scaler.inverse_transform(model.predict(last_data))
 
 # Calculate the percentage change in price over the last hour
 last_price = df.tail(1)['close'].values[0]
@@ -106,8 +105,9 @@ percent_change = (predicted_price[0][0] - last_price) / last_price
 
 # Print the predicted price and the buy, hold, or sell signal
 if percent_change > 0.01:
- print(f"The predicted price for the next hour is: {predicted_price[0][0]:.2f}.\nBuy signal.")
+    print(f"The predicted price for the next hour is: {predicted_price[0][0]:.2f}.\nBuy signal.")
 elif percent_change < -0.01:
- print(f"The predicted price for the next hour is: {predicted_price[0][0]:.2f}.\nSell signal.")
+    print(f"The predicted price for the next hour is: {predicted_price[0][0]:.2f}.\nSell signal.")
 else:
- print(f"The predicted price for the next hour is: {predicted_price[0][0]:.2f}.\nHold signal.")
+    print(f"The predicted price for the next hour is: {predicted_price[0][0]:.2f}.\nHold signal.")
+
