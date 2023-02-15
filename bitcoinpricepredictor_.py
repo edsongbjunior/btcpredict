@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Created on Wed Feb 15 00:28:36 2023
+
+@author: edsongurgel
+"""
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
 Created on Wed Dec 12 09:09:04 2022
 
 @author: edsongurgel
@@ -38,15 +46,14 @@ df.set_index('timestamp', inplace=True)
 
 # Prepare the data for training the model
 scaler = MinMaxScaler(feature_range=(0, 1))
-data = scaler.fit_transform(df[['close']].values)
+data = scaler.fit_transform(df[['open', 'high', 'low', 'close', 'volume']].values)
 lookback = 48  # Use the previous 48 hours of data to predict the next hour's price
 x_data = []
 y_data = []
 for i in range(lookback, len(data)):
-    x_data.append(data[i-lookback:i, 0])
-    y_data.append(data[i, 0])
+    x_data.append(data[i-lookback:i, :])
+    y_data.append(data[i, 3])  # Use the closing price as the target variable
 x_data, y_data = np.array(x_data), np.array(y_data)
-x_data = np.reshape(x_data, (x_data.shape[0], x_data.shape[1], 1))
 
 # Define the hyperparameters to search over
 param_grid = {
@@ -58,7 +65,7 @@ param_grid = {
 # Define the LSTM model
 def create_model(units, dropout):
     model = Sequential()
-    model.add(LSTM(units=units, return_sequences=True, input_shape=(x_data.shape[1], 1)))
+    model.add(LSTM(units=units, return_sequences=True, input_shape=(x_data.shape[1], x_data.shape[2])))
     model.add(Dropout(dropout))
     model.add(LSTM(units=units, return_sequences=True))
     model.add(Dropout(dropout))
@@ -88,12 +95,19 @@ model = create_model(best_units, best_dropout)
 model.fit(x_data, y_data, epochs=10, batch_size=best_batch_size)
 
 # Use the trained model to predict the next hour's price
-last_data = df.tail(lookback)['close'].values
-last_data = scaler.transform(last_data.reshape(-1, 1))
+last_data = df.tail(lookback)[['open', 'high', 'low', 'close', 'volume']].values
+last_data = scaler.transform(last_data)
 x_test = np.array([last_data])
-x_test = np.reshape(x_test, (x_test.shape[0], x_test.shape[1], 1))
 predicted_price = scaler.inverse_transform(model.predict(x_test))
 
-# Print the predicted price for the next hour
-print(f"The predicted price for the next hour is: {predicted_price[0][0]}")
+# Calculate the percentage change in price over the last hour
+last_price = df.tail(1)['close'].values[0]
+percent_change = (predicted_price[0][0] - last_price) / last_price
 
+# Print the predicted price and the buy, hold, or sell signal
+if percent_change > 0.01:
+ print(f"The predicted price for the next hour is: {predicted_price[0][0]:.2f}.\nBuy signal.")
+elif percent_change < -0.01:
+ print(f"The predicted price for the next hour is: {predicted_price[0][0]:.2f}.\nSell signal.")
+else:
+ print(f"The predicted price for the next hour is: {predicted_price[0][0]:.2f}.\nHold signal.")
